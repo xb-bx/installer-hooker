@@ -1,0 +1,6 @@
+cl
+%c -std=c11
+-I./libs/curl-8.7.1/include/
+-I./libs/cJSON/
+-I./libs/cwalk/include/
+-I./libs/utf8-utf16-converter/converter/include/

@@ -12,7 +12,7 @@ $cjson = "./libs/cJSON/build$env:BUILD_ARCH/Release/libcjson.lib"
 $cwalk = "./libs/cwalk/build$env:BUILD_ARCH/Release/cwalk.lib"
 $utf8conv = "./libs/utf8-utf16-converter/build$env:BUILD_ARCH/converter/Release/converter.lib"
 
-link  .\bootstrap.obj $libcurl $cjson @DEFAULTLIBS 
+link  .\bootstrap.obj $libcurl $cjson $cwalk @DEFAULTLIBS 
 
 
 

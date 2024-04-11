@@ -1,3 +1,4 @@
+#include "qbittorrent.c"
 #include "shared.c"
 #include <cJSON.h>
 #include <converter.h>
@@ -28,194 +29,13 @@ char *torrent_hash;
 char *files_url = NULL;
 char *base_path;
 
-void resume() {
-  CURL *curl;
-  CURLcode rescode;
-  curl = curl_easy_init();
-  if (curl) {
-    struct response_buf buf = {0};
-    char params[512];
-    params[sprintf(params, "hashes=%s", torrent_hash)] = 0;
-    curl_easy_setopt(curl, CURLOPT_URL,
-                     "http://127.0.0.1:8080/api/v2/torrents/resume");
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, params);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
-
-    rescode = curl_easy_perform(curl);
-    if (rescode != CURLE_OK)
-      fprintf(stderr, "curl_easy_perform() failed: %s\n",
-              curl_easy_strerror(rescode));
-
-    /* always cleanup */
-    cJSON *json = cJSON_Parse(buf.buf);
-    curl_easy_cleanup(curl);
-    if (buf.buf != NULL) {
-      free(buf.buf);
-    }
-  }
-}
-void pause() {
-  CURL *curl;
-  CURLcode rescode;
-  curl = curl_easy_init();
-  if (curl) {
-    struct response_buf buf = {0};
-    char params[512];
-    params[sprintf(params, "hashes=%s", torrent_hash)] = 0;
-    curl_easy_setopt(curl, CURLOPT_URL,
-                     "http://127.0.0.1:8080/api/v2/torrents/pause");
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, params);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
-
-    rescode = curl_easy_perform(curl);
-    if (rescode != CURLE_OK)
-      fprintf(stderr, "curl_easy_perform() failed: %s\n",
-              curl_easy_strerror(rescode));
-
-    /* always cleanup */
-    cJSON *json = cJSON_Parse(buf.buf);
-    curl_easy_cleanup(curl);
-    if (buf.buf != NULL) {
-      free(buf.buf);
-    }
-  }
-}
-void set_max_priority(int index, int prior) {
-  CURL *curl;
-  CURLcode rescode;
-  curl = curl_easy_init();
-  if (curl) {
-    struct response_buf buf = {0};
-    char params[512];
-    params[sprintf(params, "hash=%s&id=%i&priority=%i", torrent_hash, index,
-                   prior)] = 0;
-    curl_easy_setopt(curl, CURLOPT_URL,
-                     "http://127.0.0.1:8080/api/v2/torrents/filePrio");
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, params);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
-
-    rescode = curl_easy_perform(curl);
-    if (rescode != CURLE_OK)
-      fprintf(stderr, "curl_easy_perform() failed: %s\n",
-              curl_easy_strerror(rescode));
-
-    /* always cleanup */
-    cJSON *json = cJSON_Parse(buf.buf);
-    curl_easy_cleanup(curl);
-    if (buf.buf != NULL) {
-      free(buf.buf);
-    }
-  }
-}
-cJSON *get_files() {
-  CURL *curl;
-  CURLcode rescode;
-  curl = curl_easy_init();
-  if (curl) {
-    struct response_buf buf = {0};
-    curl_easy_setopt(curl, CURLOPT_URL, files_url);
-    /*curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);*/
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
-
-    rescode = curl_easy_perform(curl);
-    if (rescode != CURLE_OK)
-      fprintf(stderr, "curl_easy_perform() failed: %s\n",
-              curl_easy_strerror(rescode));
-
-    /* always cleanup */
-    cJSON *json = cJSON_Parse(buf.buf);
-    curl_easy_cleanup(curl);
-    if (buf.buf != NULL) {
-      free(buf.buf);
-    }
-    return json;
-  } else {
-    return NULL;
-  }
-}
-
-BOOL check_torrent() {
-  CURL *curl;
-  CURLcode rescode;
-  curl = curl_easy_init();
-  if (curl) {
-    struct response_buf buf = {0};
-    curl_easy_setopt(curl, CURLOPT_URL,
-                     "http://127.0.0.1:8080/api/v2/torrents/info");
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-    /*curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);*/
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
-
-    rescode = curl_easy_perform(curl);
-    if (rescode != CURLE_OK)
-      fprintf(stderr, "curl_easy_perform() failed: %s\n",
-              curl_easy_strerror(rescode));
-
-    /* always cleanup */
-    cJSON *json = cJSON_Parse(buf.buf);
-    cJSON *torrent = NULL;
-    cJSON_ArrayForEach(torrent, json) {
-      char *hash =
-          cJSON_GetObjectItemCaseSensitive(torrent, "hash")->valuestring;
-      if (strcmp(hash, torrent_hash) == 0) {
-        printf("Found\n");
-        base_path = malloc(512);
-        base_path[0] = 0;
-        strcpy(base_path,
-               cJSON_GetObjectItemCaseSensitive(torrent, "content_path")
-                   ->valuestring);
-        size_t len;
-        cwk_path_get_dirname(base_path, &len);
-        base_path[len] = 0;
-#ifdef WINE
-    char *newname = malloc(strlen(base_path) + 3);
-    strcpy(newname + 2, base_path);
-    newname[0] = 'Z';
-    newname[1] = ':';
-    int i = 0;
-    for (i = 2; i < strlen(newname); i++) {
-      if (newname[i] == '/')
-        newname[i] = '\\';
-    }
-    if (newname[i - 1] == '\\') newname[i - 1] = 0;
-    newname[i] = 0;
-    free(base_path);
-    base_path = newname;
-#endif
-        printf("%i %s\n", len, base_path);
-        cJSON_Delete(json);
-        curl_easy_cleanup(curl);
-        if (buf.buf != NULL) {
-          free(buf.buf);
-        }
-        return TRUE;
-      }
-    }
-    cJSON_Delete(json);
-    curl_easy_cleanup(curl);
-    if (buf.buf != NULL) {
-      free(buf.buf);
-    }
-    return FALSE;
-  } else {
-    return FALSE;
-  }
-}
 char **downloaded = NULL;
 int downloadcount = 0;
+
 double __declspec(dllexport) check_file(char *filename, int *index) {
-  cJSON *files = get_files();
+  cJSON *files = get_files(files_url);
   cJSON *file = NULL;
-  char buffer[2048];
+  char buffer[2048] = {0};
   double res = -1.0;
   if (downloaded == NULL) {
     downloaded = malloc(sizeof(char *) * cJSON_GetArraySize(files));
@@ -244,14 +64,16 @@ BOOL is_downloaded(char *filename) {
   return FALSE;
 }
 void __declspec(dllexport) wait_for_file(char *lpFileName) {
-  if (is_downloaded(lpFileName))
+  if (is_downloaded(lpFileName)) {
     return;
+  }
   if (torrent_hash == NULL) {
-    while (torrent_hash == NULL)
+    while (torrent_hash == NULL) {
       Sleep(100);
+    }
   }
   if (files_url == NULL) {
-    if (!check_torrent()) {
+    if (!check_torrent(torrent_hash, &base_path)) {
       printf("unknown torrent");
       exit(1);
     }
@@ -268,7 +90,7 @@ void __declspec(dllexport) wait_for_file(char *lpFileName) {
       break;
     }
     if (!prioritySet) {
-      set_max_priority(index, 7);
+      set_max_priority(torrent_hash, index, 7);
       prioritySet = true;
     }
     printf("%s %f\n", lpFileName, progress);
@@ -277,10 +99,10 @@ void __declspec(dllexport) wait_for_file(char *lpFileName) {
     }
   } while (progress >= 0.0 && progress < 1.0);
   if (prioritySet) {
-    pause();
+    pause(torrent_hash);
     Sleep(5000);
-    resume();
-    set_max_priority(index, 0);
+    resume(torrent_hash);
+    set_max_priority(torrent_hash, index, 0);
     char **newitem = &downloaded[downloadcount++];
     *newitem = malloc(strlen(lpFileName));
     strcpy(*newitem, lpFileName);
@@ -421,18 +243,18 @@ BOOL __declspec(dllexport) WINAPI
     for (int i = 0; i < 16; i++)
       newA[i] = addrA[i];
 
-    addrAttrsW =
-        GetProcAddress(GetModuleHandle("kernel32.dll"), "GetFileAttributesW");
-    for (int i = 0; i < 16; i++)
-      attrsOldW[i] = addrAttrsW[i];
-    old_protect = 0;
-    if (!VirtualProtect(addrAttrsW, 4096, PAGE_EXECUTE_READWRITE,
-                        &old_protect)) {
-      printf("error\n");
-    }
-    create_hook(attrsOldW, attrsNewW, addrAttrsW, hookFileAttrsW);
-    for (int i = 0; i < 16; i++)
-      attrsNewW[i] = addrAttrsW[i];
+    /*addrAttrsW =*/
+        /*GetProcAddress(GetModuleHandle("kernel32.dll"), "GetFileAttributesW");*/
+    /*for (int i = 0; i < 16; i++)*/
+      /*attrsOldW[i] = addrAttrsW[i];*/
+    /*old_protect = 0;*/
+    /*if (!VirtualProtect(addrAttrsW, 4096, PAGE_EXECUTE_READWRITE,*/
+                        /*&old_protect)) {*/
+      /*printf("error\n");*/
+    /*}*/
+    /*create_hook(attrsOldW, attrsNewW, addrAttrsW, hookFileAttrsW);*/
+    /*for (int i = 0; i < 16; i++)*/
+      /*attrsNewW[i] = addrAttrsW[i];*/
 
     printf("OK\n");
   }

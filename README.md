@@ -15,9 +15,9 @@ It works via injecting code into setup.exe(or whatever the name of installer is)
 # How to use
 
 1. Start downloading torrent 
-2. As soon as setup.exe donwloaded pause torrent
-3. Drag-n-drop setup.exe on bootstrap.exe
-4. Unpause torrent
+2. Drag-n-drop setup.exe on bootstrap.exe
+3. Unpause torrent
+4. Wait for install to complete
 
 
 

@@ -1,3 +1,4 @@
+#include "qbittorrent.c"
 #include "shared.c"
 #include <cJSON.h>
 #define CURL_STATICLIB
@@ -152,9 +153,49 @@ int main(int argc, char **argv) {
     printf("Could find torrent\n");
     exit(1);
   }
+  char *files_url = malloc(512);
+  sprintf(files_url, "http://127.0.0.1:8080/api/v2/torrents/files?hash=%s",
+          torrent_hash);
+  cJSON *files = get_files(files_url);
+  cJSON *file = NULL;
+  char *basename = NULL;
+  size_t blen = 0;
+
+  cwk_path_get_basename(exe, &basename, &blen);
+  int index = -1;
+  int i = 0;
+  double progress = 0;
+  cJSON_ArrayForEach(file, files) {
+    char *name = cJSON_GetObjectItemCaseSensitive(file, "name")->valuestring;
+    char *namebase = NULL;
+    cwk_path_get_basename(name, &namebase, &blen);
+    if (strcmp(basename, namebase) == 0) {
+      index = i;
+      printf("%s %s %i %i\n", basename, namebase, i, cJSON_GetObjectItemCaseSensitive(file, "index")->valueint);
+      progress = cJSON_GetObjectItemCaseSensitive(file, "progress")->valuedouble;
+      break;
+    }
+    i += 1;
+  }
+  if (progress < 1.0) { 
+    printf("Waiting for setup to finish downloading...\n");
+    set_max_priority(torrent_hash, index, 7);
+    while(progress < 1.0) {
+        Sleep(1000);
+        cJSON_Delete(files);
+        files = get_files(files_url);
+        file = cJSON_GetArrayItem(files, index);
+        progress = cJSON_GetObjectItemCaseSensitive(file, "progress")->valuedouble;
+    }
+    pause(torrent_hash);
+    Sleep(1000);
+  }
+
+
 
   CreateProcessA(exe, NULL, NULL, NULL, FALSE, NORMAL_PRIORITY_CLASS, NULL,
                  base, &sinfo, &pinfo);
+  resume(torrent_hash);
 
   BOOL is32 = FALSE;
   IsWow64Process(pinfo.hProcess, &is32);

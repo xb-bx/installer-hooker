@@ -1,11 +1,13 @@
 #include "shared.c"
 #include <cJSON.h>
+#define CURL_STATICLIB
 #include <curl/curl.h>
 #include <shlwapi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <tlhelp32.h>
 #include <windows.h>
+#include <cwalk.h>
 
 void hooktree(char *szFileName, char *hooker, char *cmdline, int pid,
               char *hash) {
@@ -138,9 +140,13 @@ int main(int argc, char **argv) {
     exe = &exe[1];
   }
   sprintf(cmdline, "\"%s\"", exe);
-  strcpy(base, exe);
-  PathRemoveFileSpecA(base);
-  printf("'%s'\n", exe);
+  strcpy(base, exe); 
+  cwk_path_set_style(cwk_path_guess_style(base));
+  cwk_path_get_dirname(base, &len);
+  if (len > 1 && base[len - 1] == '/') base[len-1] = 0;
+  base[len] = 0;
+  
+  printf("'%s' '%s'\n", exe, base);
   char *torrent_hash = find_torrent(base);
   if (torrent_hash == NULL) {
     printf("Could find torrent\n");
@@ -161,7 +167,9 @@ int main(int argc, char **argv) {
   printf("starting %s\n", hooker);
   TCHAR szFileName[MAX_PATH];
   GetModuleFileName(NULL, szFileName, MAX_PATH);
-  PathRemoveFileSpecA(szFileName);
+  cwk_path_set_style(cwk_path_guess_style(szFileName));
+  cwk_path_get_dirname(szFileName, &len);
+  szFileName[len] = 0;
   SetCurrentDirectory(szFileName);
   hooktree(szFileName, hooker, cmdline, pinfo.dwProcessId, torrent_hash);
 }

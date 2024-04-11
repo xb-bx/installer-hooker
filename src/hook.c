@@ -1,6 +1,7 @@
 #include "shared.c"
 #include <cJSON.h>
 #include <converter.h>
+#define CURL_STATICLIB
 #include <curl/curl.h>
 #include <cwalk.h>
 #include <stdio.h>
@@ -112,37 +113,32 @@ void set_max_priority(int index, int prior) {
     }
   }
 }
-cJSON *files = NULL;
 cJSON *get_files() {
-  if (files == NULL) {
-    CURL *curl;
-    CURLcode rescode;
-    curl = curl_easy_init();
-    if (curl) {
-      struct response_buf buf = {0};
-      curl_easy_setopt(curl, CURLOPT_URL, files_url);
-      /*curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);*/
-      curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-      curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-      curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
+  CURL *curl;
+  CURLcode rescode;
+  curl = curl_easy_init();
+  if (curl) {
+    struct response_buf buf = {0};
+    curl_easy_setopt(curl, CURLOPT_URL, files_url);
+    /*curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);*/
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
 
-      rescode = curl_easy_perform(curl);
-      if (rescode != CURLE_OK)
-        fprintf(stderr, "curl_easy_perform() failed: %s\n",
-                curl_easy_strerror(rescode));
+    rescode = curl_easy_perform(curl);
+    if (rescode != CURLE_OK)
+      fprintf(stderr, "curl_easy_perform() failed: %s\n",
+              curl_easy_strerror(rescode));
 
-      /* always cleanup */
-      cJSON *json = cJSON_Parse(buf.buf);
-      curl_easy_cleanup(curl);
-      if (buf.buf != NULL) {
-        free(buf.buf);
-      }
-      return json;
-    } else {
-      return NULL;
+    /* always cleanup */
+    cJSON *json = cJSON_Parse(buf.buf);
+    curl_easy_cleanup(curl);
+    if (buf.buf != NULL) {
+      free(buf.buf);
     }
+    return json;
   } else {
-    return files;
+    return NULL;
   }
 }
 
@@ -180,6 +176,21 @@ BOOL check_torrent() {
         size_t len;
         cwk_path_get_dirname(base_path, &len);
         base_path[len] = 0;
+#ifdef WINE
+    char *newname = malloc(strlen(base_path) + 3);
+    strcpy(newname + 2, base_path);
+    newname[0] = 'Z';
+    newname[1] = ':';
+    int i = 0;
+    for (i = 2; i < strlen(newname); i++) {
+      if (newname[i] == '/')
+        newname[i] = '\\';
+    }
+    if (newname[i - 1] == '\\') newname[i - 1] = 0;
+    newname[i] = 0;
+    free(base_path);
+    base_path = newname;
+#endif
         printf("%i %s\n", len, base_path);
         cJSON_Delete(json);
         curl_easy_cleanup(curl);
@@ -211,6 +222,7 @@ double __declspec(dllexport) check_file(char *filename, int *index) {
   }
   cJSON_ArrayForEach(file, files) {
     char *name = cJSON_GetObjectItemCaseSensitive(file, "name")->valuestring;
+    cwk_path_set_style(cwk_path_guess_style(base_path));
     cwk_path_join(base_path, name, buffer, 2048);
     if (strcmp(filename, buffer) == 0) {
       res = cJSON_GetObjectItemCaseSensitive(file, "progress")->valuedouble;
@@ -218,6 +230,7 @@ double __declspec(dllexport) check_file(char *filename, int *index) {
       break;
     }
   }
+  cJSON_Delete(files);
   return res;
 }
 BOOL is_downloaded(char *filename) {
@@ -364,7 +377,6 @@ void __declspec(dllexport)
   addr[offset + 11] = 0xe0;
 #endif
 }
-
 BOOL __declspec(dllexport) WINAPI
     DllMain(HINSTANCE _hinstDLL, // handle to DLL module
             DWORD _fdwReason,    // reason for calling function

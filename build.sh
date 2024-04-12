@@ -23,8 +23,8 @@ link hook.obj $libcurl $cjson $cwalk $utf8conv $DEFAULTLIBS /OUT:./output/hook$B
 
 cl /DWINE ./src/hooker.c
 mv hooker.exe ./output/hooker$BUILD_ARCH.exe
-cp /DWINE ./src/manifest.xml ./output/hooker$BUILD_ARCH.exe.manifest
-cp /DWINE ./src/manifest.xml ./output/bootstrap.exe.manifest
+cp ./src/manifest.xml ./output/hooker$BUILD_ARCH.exe.manifest
+cp ./src/manifest.xml ./output/bootstrap.exe.manifest
 
 rm -f *.exp *.lib *obj
 rm -f output/*.exp output/*.lib output/*obj

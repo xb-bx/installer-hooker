@@ -11,7 +11,7 @@ int main(int argc, char **argv) {
   char *set_hook_name = "_set_hash@4";
 #elif defined _M_X64
   char *dllpathbuf = "hook64.dll";
-  char *set_hook_name = "_set_hash@8";
+  char *set_hook_name = "set_hash";
 #endif
   char *buf = malloc(512);
   GetFullPathName(dllpathbuf, 512, buf, NULL);

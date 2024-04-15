@@ -23,8 +23,13 @@ char *addrW;
 char oldRead[16];
 char newRead[16];
 char *addrRead;
+char oldClose[16];
+char newClose[16];
+char *addrClose;
+
 char oldWKB[16];
 char newWKB[16];
+
 char *addrWKB;
 char oldA[16];
 char newA[16];
@@ -210,7 +215,17 @@ void register_file(char *filename, HANDLE h) {
                           .piece_end = end,
                           .last_downloaded_piece = 0});
 }
-
+BOOL __declspec(dllexport) __stdcall CloseHandleHook(HANDLE h) {
+  if (map != NULL && map_get(map, h) != NULL) {
+    map_remove(map, h);
+  }
+  for (int i = 0; i < 16; i++)
+    addrClose[i] = oldClose[i];
+  BOOL res = CloseHandle(h);
+  for (int i = 0; i < 16; i++)
+    addrClose[i] = newClose[i];
+  return res;
+}
 BOOL __declspec(dllexport) __stdcall ReadFileHook(HANDLE hFile, LPVOID lpBuffer,
                                                   DWORD nNumberOfBytesToRead,
                                                   LPDWORD lpNumberOfBytesRead,
@@ -234,20 +249,14 @@ BOOL __declspec(dllexport) __stdcall ReadFileHook(HANDLE hFile, LPVOID lpBuffer,
         BOOL finished = FALSE;
         while (!finished) {
           get_pieces(torrent_hash, pieces);
-
-          printf("waitiuiioing for %s %lli %i %i %i %i %i\n", file->name, pos,
-                 piece_size, file->piece_start, file->piece_end, start_piece,
-                 end_piece);
-          /*printf("pieces: ");*/
           for (int i = start_piece; i <= end_piece && i < pieces_count; i++) {
-            /*printf("%i ", pieces[i]);*/
             if (pieces[i] != DOWNLOADED) {
               file->last_downloaded_piece = i - 1;
               goto wait;
             }
           }
-          for (int i = file->piece_start; i < pieces_count && i < file->piece_end;
-               i++) {
+          for (int i = file->piece_start;
+               i < pieces_count && i < file->piece_end; i++) {
             file->last_downloaded_piece = i;
             if (pieces[i] != DOWNLOADED) {
               file->last_downloaded_piece = i - 1;
@@ -261,12 +270,8 @@ BOOL __declspec(dllexport) __stdcall ReadFileHook(HANDLE hFile, LPVOID lpBuffer,
                  file->piece_end, start_piece, end_piece);
           Sleep(5000);
         }
-        if(end_piece == file->piece_end) {
-            file->finished = TRUE;
-            pause(torrent_hash);
-            set_max_priority(torrent_hash, file->index, 0);
-            Sleep(1000);
-            resume(torrent_hash);
+        if (end_piece == file->piece_end) {
+          file->finished = TRUE;
         }
       }
     }
@@ -350,32 +355,39 @@ BOOL __declspec(dllexport) WINAPI
     create_hook(oldRead, newRead, addrRead, ReadFileHook);
     for (int i = 0; i < 16; i++)
       newRead[i] = addrRead[i];
-    /*addrWKB = GetProcAddress(GetModuleHandle("kernelbase.dll"),
-     * "CreateFileW");*/
-    /*for (int i = 0; i < 16; i++)*/
-    /*oldWKB[i] = addrWKB[i];*/
-    /*old_protect = 0;*/
-    /*if (!VirtualProtect(addrWKB, 4096, PAGE_EXECUTE_READWRITE, &old_protect))
-     * {*/
-    /*printf("error\n");*/
-    /*}*/
-    /*create_hook(oldWKB, newWKB, addrWKB, hookWKB);*/
-    /*for (int i = 0; i < 16; i++)*/
-    /*newWKB[i] = addrWKB[i];*/
 
-    /*addrA = GetProcAddress(GetModuleHandle("kernel32.dll"), "CreateFileA");*/
-    /*for (int i = 0; i < 16; i++)*/
-    /*oldA[i] = addrA[i];*/
-    /*old_protect = 0;*/
-    /*if (!VirtualProtect(addrA, 4096, PAGE_EXECUTE_READWRITE, &old_protect))
-     * {*/
-    /*printf("error\n");*/
-    /*}*/
-    /*create_hook(oldA, newA, addrA, hookA);*/
-    /*for (int i = 0; i < 16; i++)*/
-    /*newA[i] = addrA[i];*/
+    addrClose = GetProcAddress(GetModuleHandle("kernel32.dll"), "CloseHandle");
+    for (int i = 0; i < 16; i++)
+      oldClose[i] = addrClose[i];
+    old_protect = 0;
+    if (!VirtualProtect(addrClose, 4096, PAGE_EXECUTE_READWRITE,
+                        &old_protect)) {
+      printf("error\n");
+    }
+    create_hook(oldClose, newClose, addrClose, CloseHandleHook);
+    for (int i = 0; i < 16; i++)
+      newClose[i] = addrClose[i];
+    addrWKB = GetProcAddress(GetModuleHandle("kernelbase.dll"), "CreateFileW");
+    for (int i = 0; i < 16; i++)
+      oldWKB[i] = addrWKB[i];
+    old_protect = 0;
+    if (!VirtualProtect(addrWKB, 4096, PAGE_EXECUTE_READWRITE, &old_protect)) {
+      printf("error\n");
+    }
+    create_hook(oldWKB, newWKB, addrWKB, hookWKB);
+    for (int i = 0; i < 16; i++)
+      newWKB[i] = addrWKB[i];
 
-    /*printf("OK\n");*/
+    addrA = GetProcAddress(GetModuleHandle("kernel32.dll"), "CreateFileA");
+    for (int i = 0; i < 16; i++)
+      oldA[i] = addrA[i];
+    old_protect = 0;
+    if (!VirtualProtect(addrA, 4096, PAGE_EXECUTE_READWRITE, &old_protect)) {
+      printf("error\n");
+    }
+    create_hook(oldA, newA, addrA, hookA);
+    for (int i = 0; i < 16; i++)
+      newA[i] = addrA[i];
   }
   return TRUE;
 }

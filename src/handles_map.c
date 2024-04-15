@@ -27,7 +27,7 @@ void map_add(HandlesMap *map, FileInfo info) {
   if (map->count == map->size) {
     FileInfo *items = malloc(sizeof(FileInfo) * map->size * 2);
     for (int i = 0; i < map->count; i++) {
-        items[i] = map->items[i];
+      items[i] = map->items[i];
     }
     free(map->items);
     map->items = items;
@@ -35,10 +35,21 @@ void map_add(HandlesMap *map, FileInfo info) {
   }
   map->items[map->count++] = info;
 }
+void map_remove(HandlesMap *map, HANDLE h) {
+  for (int i = 0; i < map->count; i++) {
+    if (map->items[i].h == h) {
+      for (int j = i; j < map->count - 1; j++) {
+        map->items[j] = map->items[j + 1];
+      }
+      map->count--;
+      break;
+    }
+  }
+}
 HandlesMap *map_new() {
-    HandlesMap *map = malloc(sizeof(HandlesMap));
-    map->size = 8;
-    map->count = 0;
-    map->items = malloc(sizeof(FileInfo) * map->size);
-    return map;
+  HandlesMap *map = malloc(sizeof(HandlesMap));
+  map->size = 8;
+  map->count = 0;
+  map->items = malloc(sizeof(FileInfo) * map->size);
+  return map;
 }

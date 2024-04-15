@@ -3,12 +3,12 @@
 #include <cJSON.h>
 #define CURL_STATICLIB
 #include <curl/curl.h>
+#include <cwalk.h>
 #include <shlwapi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <tlhelp32.h>
 #include <windows.h>
-#include <cwalk.h>
 
 void hooktree(char *szFileName, char *hooker, char *cmdline, int pid,
               char *hash) {
@@ -106,14 +106,31 @@ char *find_torrent(char *base) {
     cJSON *json = cJSON_Parse(buf.buf);
     cJSON *torrent = NULL;
     cJSON_ArrayForEach(torrent, json) {
+
       char *content_path =
           cJSON_GetObjectItemCaseSensitive(torrent, "content_path")
               ->valuestring;
+#ifdef WINE
+        char *newname = malloc(strlen(content_path) + 3);
+        strcpy(newname + 2, content_path);
+        newname[0] = 'Z';
+        newname[1] = ':';
+        int i = 0;
+        for (i = 2; i < strlen(newname); i++) {
+          if (newname[i] == '/')
+            newname[i] = '\\';
+        }
+        if (newname[i - 1] == '\\')
+          newname[i - 1] = 0;
+        newname[i] = 0;
+        content_path = newname;
+#endif
+      printf("%s %s\n", content_path, base);
       if (strcmp(content_path, base) == 0) {
         return cJSON_GetObjectItemCaseSensitive(torrent, "hash")->valuestring;
       }
     }
-    cJSON_Delete(json);
+    /*cJSON_Delete(json);*/
     curl_easy_cleanup(curl);
     if (buf.buf != NULL) {
       free(buf.buf);
@@ -141,14 +158,16 @@ int main(int argc, char **argv) {
     exe = &exe[1];
   }
   sprintf(cmdline, "\"%s\"", exe);
-  strcpy(base, exe); 
+  strcpy(base, exe);
   cwk_path_set_style(cwk_path_guess_style(base));
   cwk_path_get_dirname(base, &len);
-  if (len > 1 && base[len - 1] == '/') base[len-1] = 0;
+  if (len > 1 && (base[len - 1] == '/' || base[len-1] == '\\'))
+    base[len - 1] = 0;
   base[len] = 0;
-  
+
   printf("'%s' '%s'\n", exe, base);
   char *torrent_hash = find_torrent(base);
+  printf("hash: %s\n", torrent_hash);
   if (torrent_hash == NULL) {
     printf("Could find torrent\n");
     exit(1);
@@ -160,6 +179,7 @@ int main(int argc, char **argv) {
   cJSON *file = NULL;
   char *basename = NULL;
   size_t blen = 0;
+  ensure_seq_dl(torrent_hash);
 
   cwk_path_get_basename(exe, &basename, &blen);
   int index = -1;
@@ -171,27 +191,28 @@ int main(int argc, char **argv) {
     cwk_path_get_basename(name, &namebase, &blen);
     if (strcmp(basename, namebase) == 0) {
       index = i;
-      printf("%s %s %i %i\n", basename, namebase, i, cJSON_GetObjectItemCaseSensitive(file, "index")->valueint);
-      progress = cJSON_GetObjectItemCaseSensitive(file, "progress")->valuedouble;
+      printf("%s %s %i %i\n", basename, namebase, i,
+             cJSON_GetObjectItemCaseSensitive(file, "index")->valueint);
+      progress =
+          cJSON_GetObjectItemCaseSensitive(file, "progress")->valuedouble;
       break;
     }
     i += 1;
   }
-  if (progress < 1.0) { 
+  if (progress < 1.0) {
     printf("Waiting for setup to finish downloading...\n");
     set_max_priority(torrent_hash, index, 7);
-    while(progress < 1.0) {
-        Sleep(1000);
-        cJSON_Delete(files);
-        files = get_files(files_url);
-        file = cJSON_GetArrayItem(files, index);
-        progress = cJSON_GetObjectItemCaseSensitive(file, "progress")->valuedouble;
+    while (progress < 1.0) {
+      Sleep(1000);
+      cJSON_Delete(files);
+      files = get_files(files_url);
+      file = cJSON_GetArrayItem(files, index);
+      progress =
+          cJSON_GetObjectItemCaseSensitive(file, "progress")->valuedouble;
     }
     pause(torrent_hash);
     Sleep(1000);
   }
-
-
 
   CreateProcessA(exe, NULL, NULL, NULL, FALSE, NORMAL_PRIORITY_CLASS, NULL,
                  base, &sinfo, &pinfo);

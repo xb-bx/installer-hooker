@@ -89,12 +89,17 @@ void ensure_seq_dl(char *torrent_hash) {
 
     cJSON *json = cJSON_Parse(buf.buf);
     cJSON *torrent = NULL;
+    BOOL found = FALSE;
     cJSON_ArrayForEach(torrent, json) {
       if (strcmp(cJSON_GetObjectItemCaseSensitive(torrent, "hash")->valuestring,
                  torrent_hash) == 0) {
+          found = TRUE;
         break;
       }
-      torrent = NULL;
+    }
+    if(!found) {
+        printf("oopsie");
+        exit(1);
     }
     if (cJSON_IsFalse(cJSON_GetObjectItemCaseSensitive(torrent, "seq_dl"))) {
       toggle_seq_dl(torrent_hash);

@@ -1,5 +1,6 @@
 #include <windows.h>
 #include "shared.h"
+#include <stdio.h>
 size_t write_data(void *buffer, size_t size, size_t nmemb, void *userp) {
   struct response_buf *mem = (struct response_buf *)userp;
   size_t realsize = size * nmemb;

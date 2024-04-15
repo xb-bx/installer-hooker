@@ -122,41 +122,6 @@ void __declspec(dllexport) wait_for_file(char *lpFileName) {
 void __declspec(dllexport) __stdcall set_hash(char *hash) {
   torrent_hash = hash;
 }
-HANDLE __declspec(dllexport) __stdcall hookA(
-    LPCSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode,
-    LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition,
-    DWORD dwFlagsAndAttributes, HANDLE hTemplateFile) {
-  wait_for_file(lpFileName);
-  for (int i = 0; i < 16; i++)
-    addrA[i] = oldA[i];
-  HANDLE res = CreateFileA(lpFileName, dwDesiredAccess, dwShareMode,
-                           lpSecurityAttributes, dwCreationDisposition,
-                           dwFlagsAndAttributes, hTemplateFile);
-  for (int i = 0; i < 16; i++)
-    addrA[i] = newA[i];
-  return res;
-}
-
-HANDLE __declspec(dllexport) __stdcall hookWKB(
-    LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode,
-    LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition,
-    DWORD dwFlagsAndAttributes, HANDLE hTemplateFile) {
-  char *utf8filename = malloc(512);
-  size_t len =
-      utf16_to_utf8(lpFileName, lstrlenW(lpFileName), utf8filename, 512);
-  utf8filename[len] = 0;
-  wait_for_file(utf8filename);
-
-  for (int i = 0; i < 16; i++)
-    addrWKB[i] = oldWKB[i];
-  HANDLE res = CreateFileW(lpFileName, dwDesiredAccess, dwShareMode,
-                           lpSecurityAttributes, dwCreationDisposition,
-                           dwFlagsAndAttributes, hTemplateFile);
-  for (int i = 0; i < 16; i++)
-    addrWKB[i] = newWKB[i];
-  free(utf8filename);
-  return res;
-}
 HandlesMap *map = NULL;
 PIECE_STATE *pieces = NULL;
 int pieces_count;
@@ -215,6 +180,45 @@ void register_file(char *filename, HANDLE h) {
                           .piece_end = end,
                           .last_downloaded_piece = 0});
 }
+HANDLE __declspec(dllexport) __stdcall hookA(
+    LPCSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode,
+    LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition,
+    DWORD dwFlagsAndAttributes, HANDLE hTemplateFile) {
+  /*wait_for_file(lpFileName);*/
+  for (int i = 0; i < 16; i++)
+    addrA[i] = oldA[i];
+  HANDLE res = CreateFileA(lpFileName, dwDesiredAccess, dwShareMode,
+                           lpSecurityAttributes, dwCreationDisposition,
+                           dwFlagsAndAttributes, hTemplateFile);
+  register_file(lpFileName, res);
+  for (int i = 0; i < 16; i++)
+    addrA[i] = newA[i];
+  return res;
+}
+
+HANDLE __declspec(dllexport) __stdcall hookWKB(
+    LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode,
+    LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition,
+    DWORD dwFlagsAndAttributes, HANDLE hTemplateFile) {
+  char *utf8filename = malloc(512);
+  size_t len =
+      utf16_to_utf8(lpFileName, lstrlenW(lpFileName), utf8filename, 512);
+  utf8filename[len] = 0;
+  /*wait_for_file(utf8filename);*/
+
+  for (int i = 0; i < 16; i++)
+    addrWKB[i] = oldWKB[i];
+  HANDLE res = CreateFileW(lpFileName, dwDesiredAccess, dwShareMode,
+                           lpSecurityAttributes, dwCreationDisposition,
+                           dwFlagsAndAttributes, hTemplateFile);
+
+  register_file(utf8filename, res);
+  for (int i = 0; i < 16; i++)
+    addrWKB[i] = newWKB[i];
+  free(utf8filename);
+  return res;
+}
+
 BOOL __declspec(dllexport) __stdcall CloseHandleHook(HANDLE h) {
   if (map != NULL && map_get(map, h) != NULL) {
     map_remove(map, h);

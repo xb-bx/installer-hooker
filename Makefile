@@ -106,8 +106,10 @@ output/hooker$(ARCH).exe: obj/$(ARCH)/hooker.obj
 	mkdir -p output
 	link /NOIMPLIB /NOEXP $< /OUT:$@
 output/bootstrap.exe.manifest: src/manifest.xml
+	mkdir -p output
 	cp $< $@
 output/hooker$(ARCH).exe.manifest: src/manifest.xml
+	mkdir -p output
 	cp $< $@
 
 all: output/bootstrap.exe output/hooker$(ARCH).exe output/hook$(ARCH).dll output/bootstrap.exe.manifest output/hooker$(ARCH).exe.manifest 
@@ -117,6 +119,7 @@ all-arch:
 	ARCH=64 PATH=$(MSVC_X64):$(PATH) make all
 
 .PHONY: clean
+clean:
 	rm -rf obj output 
 .PHONY: distclean
 distclean: clean

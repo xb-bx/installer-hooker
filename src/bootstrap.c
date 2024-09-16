@@ -86,6 +86,10 @@ size_t getline(char **lineptr, size_t *n, FILE *stream) {
 
     return p - bufptr - 1;
 }
+int prefix(const char *pre, const char *str)
+{
+    return strncmp(pre, str, strlen(pre)) == 0;
+}
 char *find_torrent(char *base) {
     CURL *curl;
     CURLcode rescode;
@@ -125,8 +129,8 @@ char *find_torrent(char *base) {
             newname[i] = 0;
             content_path = newname;
 #endif
-            printf("%s %s\n", content_path, base);
-            if (strcmp(content_path, base) == 0) {
+            printf("'%s' '%s'\n", content_path, base);
+            if (prefix(content_path, base)) {
                 return cJSON_GetObjectItemCaseSensitive(torrent, "hash")
                     ->valuestring;
             }
